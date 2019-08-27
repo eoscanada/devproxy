@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/eoscanada/devproxy/insecure"
 	"github.com/gogo/protobuf/proto"
 	descriptor "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"google.golang.org/grpc"
@@ -19,7 +18,6 @@ func dialOptions(endpoint string) (opts []grpc.DialOption) {
 	if strings.Contains(endpoint, "*") {
 		zlog.Info("with transport credentials")
 		creds := credentials.NewTLS(&tls.Config{
-			RootCAs:            insecure.CertPool,
 			InsecureSkipVerify: true,
 		})
 		opts = append(opts, grpc.WithTransportCredentials(creds))
