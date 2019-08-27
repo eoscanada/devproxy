@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -17,7 +18,11 @@ import (
 func dialOptions(endpoint string) (opts []grpc.DialOption) {
 	if strings.Contains(endpoint, "*") {
 		zlog.Info("with transport credentials")
-		opts = append(opts, grpc.WithTransportCredentials(credentials.NewClientTLSFromCert(insecure.CertPool, "")))
+		creds := credentials.NewTLS(&tls.Config{
+			RootCAs:            insecure.CertPool,
+			InsecureSkipVerify: true,
+		})
+		opts = append(opts, grpc.WithTransportCredentials(creds))
 	} else {
 		zlog.Info("insecure endpoint")
 		opts = append(opts, grpc.WithInsecure())
