@@ -26,7 +26,10 @@ func (s *ReflectServer) Director(ctx context.Context, fullMethodName string) (co
 		return nil, nil, grpc.Errorf(codes.Unimplemented, "Unknown method")
 	}
 
-	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithInsecure(), grpc.WithCodec(proxy.Codec()))
+	opts := dialOptions(endpoint)
+	opts = append(opts, grpc.WithCodec(proxy.Codec()))
+
+	conn, err := grpc.DialContext(ctx, endpoint, opts...)
 	return ctx, conn, err
 
 	// md, ok := metadata.FromContext(ctx)
