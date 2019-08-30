@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	pbdevproxy "github.com/eoscanada/devproxy/pb/dfuse/devproxy/v1"
 	"github.com/eoscanada/logging"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -61,6 +62,7 @@ func main() {
 		grpc.UnknownServiceHandler(proxy.TransparentHandler(srv.Director)),
 	)
 
+	pbdevproxy.RegisterDevproxyServer(gs, srv)
 	pbreflect.RegisterServerReflectionServer(gs, srv)
 
 	// When queries on the reflection endpoint, return a UNION of all the services behind/below.

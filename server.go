@@ -7,10 +7,12 @@ import (
 	"io"
 	"strings"
 
+	pbdevproxy "github.com/eoscanada/devproxy/pb/dfuse/devproxy/v1"
 	proxy "github.com/mwitkow/grpc-proxy/proxy"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	pbreflect "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 )
 
@@ -19,11 +21,18 @@ type ReflectServer struct {
 }
 
 func (s *ReflectServer) Director(ctx context.Context, fullMethodName string) (context.Context, *grpc.ClientConn, error) {
-	fmt.Println("full method name", fullMethodName)
-	parts := strings.Split(fullMethodName, "/")
-	endpoint := s.conf.serviceToEndpoint[parts[1]]
+	var endpoint string
+	// check in the headers if `server` is specified, in which case, forward to it directly
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok && len(md.Get("server")) != 0 {
+		endpoint = md.Get("server")[0]
+	} else {
+		fmt.Println("full method name", fullMethodName)
+		parts := strings.Split(fullMethodName, "/")
+		endpoint = s.conf.serviceToEndpoint[parts[1]]
+	}
 	if endpoint == "" {
-		return nil, nil, grpc.Errorf(codes.Unimplemented, "Unknown method")
+		return nil, nil, grpc.Errorf(codes.Unimplemented, "Unknown method or endpoint to reach")
 	}
 
 	opts := dialOptions(endpoint)
@@ -44,6 +53,12 @@ func (s *ReflectServer) Director(ctx context.Context, fullMethodName string) (co
 	// }
 
 	// return grpc.DialContext(
+}
+
+func (s *ReflectServer) ListServers(ctx context.Context, req *pbdevproxy.ListRequest) (*pbdevproxy.ListResponse, error) {
+	return &pbdevproxy.ListResponse{
+		Servers: s.conf.allServices,
+	}, nil
 }
 
 func (s *ReflectServer) ServerReflectionInfo(stream pbreflect.ServerReflection_ServerReflectionInfoServer) error {
