@@ -7,7 +7,7 @@ services=(
   # First so it's easy to always have the * on it when adding/removing services
   "dgraphql-internal-v2"
 
-  "abicodec-v2"
+  # "abicodec-v2"
   "blockmeta-v2"
   "search-liverouter-v2"
   "search-archive-v2-0"

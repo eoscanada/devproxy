@@ -20,13 +20,14 @@ type ReflectServer struct {
 }
 
 func (s *ReflectServer) Director(ctx context.Context, fullMethodName string) (context.Context, *grpc.ClientConn, error) {
+	md, metadataExists := metadata.FromIncomingContext(ctx)
+	zlog.Info("reflect server director request", zap.String("method_name", fullMethodName), zap.Reflect("metadata", md))
+
 	var endpoint string
 	// check in the headers if `server` is specified, in which case, forward to it directly
-	md, ok := metadata.FromIncomingContext(ctx)
-	if ok && len(md.Get("server")) != 0 {
+	if metadataExists && len(md.Get("server")) != 0 {
 		endpoint = md.Get("server")[0]
 	} else {
-		zlog.Info("full method name", zap.String("method_name", fullMethodName))
 		parts := strings.Split(fullMethodName, "/")
 		endpoint = s.conf.serviceToEndpoint[parts[1]]
 	}

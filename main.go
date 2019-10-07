@@ -18,7 +18,7 @@ import (
 )
 
 var flagListenAddr = flag.String("listen-addr", ":9001", "gRPC listen address")
-var flagServices = flag.String("services", "localhost:7001*,localhost:7002,localhost:7003,localhost:7004,localhost:7005", "Comma-separated list of service:port to reverse proxy and cumulate Reflection endpoints.")
+var flagServices = flag.String("services", "localhost:7001*,localhost:7002,localhost:7003,localhost:7004", "Comma-separated list of service:port to reverse proxy and cumulate Reflection endpoints.")
 
 func main() {
 	flag.Parse()
