@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -27,10 +26,11 @@ func (s *ReflectServer) Director(ctx context.Context, fullMethodName string) (co
 	if ok && len(md.Get("server")) != 0 {
 		endpoint = md.Get("server")[0]
 	} else {
-		fmt.Println("full method name", fullMethodName)
+		zlog.Info("full method name", zap.String("method_name", fullMethodName))
 		parts := strings.Split(fullMethodName, "/")
 		endpoint = s.conf.serviceToEndpoint[parts[1]]
 	}
+
 	if endpoint == "" {
 		return nil, nil, grpc.Errorf(codes.Unimplemented, "Unknown method or endpoint to reach")
 	}
@@ -40,19 +40,6 @@ func (s *ReflectServer) Director(ctx context.Context, fullMethodName string) (co
 
 	conn, err := grpc.DialContext(ctx, endpoint, opts...)
 	return ctx, conn, err
-
-	// md, ok := metadata.FromContext(ctx)
-	// if ok {
-	// 	// Decide on which backend to dial
-	// 	if val, exists := md[":authority"]; exists && val[0] == "staging.api.example.com" {
-	// 		// Make sure we use DialContext so the dialing can be cancelled/time out together with the context.
-	// 		return grpc.DialContext(ctx, "api-service.staging.svc.local", grpc.WithCodec(proxy.Codec()))
-	// 	} else if val, exists := md[":authority"]; exists && val[0] == "api.example.com" {
-	// 		return grpc.DialContext(ctx, "api-service.prod.svc.local", grpc.WithCodec(proxy.Codec()))
-	// 	}
-	// }
-
-	// return grpc.DialContext(
 }
 
 func (s *ReflectServer) ListServers(ctx context.Context, req *pbdevproxy.ListRequest) (*pbdevproxy.ListResponse, error) {
@@ -71,9 +58,6 @@ func (s *ReflectServer) ServerReflectionInfo(stream pbreflect.ServerReflection_S
 			zlog.Error("error reading message", zap.Error(err))
 			break
 		}
-
-		cnt, _ := json.MarshalIndent(msg, "", "  ")
-		fmt.Println("RRRRRRRRRITA", string(cnt))
 
 		switch req := msg.MessageRequest.(type) {
 		case *pbreflect.ServerReflectionRequest_FileByFilename:
@@ -96,7 +80,6 @@ func (s *ReflectServer) ServerReflectionInfo(stream pbreflect.ServerReflection_S
 					Name: svc,
 				})
 			}
-			fmt.Println("MAMA", s.conf.allServices)
 
 			err = stream.Send(&pbreflect.ServerReflectionResponse{
 				ValidHost:       msg.Host, //// wuut anyway?

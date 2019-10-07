@@ -2,11 +2,10 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"net"
-	"os"
 	"strings"
 
+	"github.com/eoscanada/derr"
 	pbdevproxy "github.com/eoscanada/devproxy/pb/dfuse/devproxy/v1"
 	"github.com/eoscanada/logging"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -19,31 +18,26 @@ import (
 )
 
 var flagListenAddr = flag.String("listen-addr", ":9001", "gRPC listen address")
-var flagServices = flag.String("services", "", "Comma-separated list of service:port to reverse proxy and cumulate Reflection endpoints.")
+var flagServices = flag.String("services", "localhost:7001*,localhost:7002,localhost:7003,localhost:7004,localhost:7005", "Comma-separated list of service:port to reverse proxy and cumulate Reflection endpoints.")
 
 func main() {
 	flag.Parse()
 	setupLogger()
-	//  devproxy --service asljldkjf --listen-addr=:9000 --config /etc/config/map.json
-
-	// /dfuse.devproxy.v1.Infos/GetInfos
-	// {"blocks_url": "gs://therightblocks-url-from-the-operator",
-	//  "search_version": "aslfdkjdsa"},
 
 	services := strings.SplitN(*flagServices, ",", -1)
-
 	conf := newConfig()
 
-	errorCheck("discover", discover(services, conf))
+	// Aggregate all the methods supported
+	derr.ErrorCheck("discover", discover(services, conf))
 
 	zlog.Info("ready")
-	// Aggregate all the methods supported
 
 	lis, err := net.Listen("tcp", *flagListenAddr)
 	if err != nil {
 		zlog.Fatal("failed listening grpc", zap.String("grpc_listen_addr", *flagListenAddr), zap.Error(err))
 	}
 
+	zlog.Debug("known services", zap.Strings("services", conf.allServices))
 	srv := &ReflectServer{conf: conf}
 
 	unaryLog, streamLog := logging.ServerInterceptors()
@@ -70,12 +64,5 @@ func main() {
 	zlog.Info("listening & serving gRPC content", zap.String("grpc_listen_addr", *flagListenAddr))
 	if err := gs.Serve(lis); err != nil {
 		zlog.Fatal("error on gs.Serve", zap.Error(err))
-	}
-}
-
-func errorCheck(prefix string, err error) {
-	if err != nil {
-		fmt.Printf("%s: %s\n", prefix, err)
-		os.Exit(1)
 	}
 }

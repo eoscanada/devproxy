@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/eoscanada/derr"
 	"github.com/gogo/protobuf/proto"
 	descriptor "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	pbreflect "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
@@ -40,25 +42,22 @@ func discover(services []string, conf *config) error {
 		opts := dialOptions(srv)
 
 		conn, err := grpc.Dial(target, opts...)
-		errorCheck("dialing to service "+srv, err)
+		derr.ErrorCheck("dialing to service "+srv, err)
 
 		client := pbreflect.NewServerReflectionClient(conn)
 		stream, err := client.ServerReflectionInfo(context.Background())
-		errorCheck("setting up client", err)
+		derr.ErrorCheck("setting up client", err)
 
 		err = stream.Send(&pbreflect.ServerReflectionRequest{
 			Host:           target,
 			MessageRequest: &pbreflect.ServerReflectionRequest_ListServices{ListServices: "*"},
 		})
-		errorCheck("sending reflection request", err)
+		derr.ErrorCheck("sending list services request", err)
 
 		resp, err := stream.Recv()
-		errorCheck("receiving reflection response", err)
+		derr.ErrorCheck("receiving list services response", err)
 
-		cnt, err := json.MarshalIndent(resp, "", "  ")
-		errorCheck("json marshal", err)
-
-		fmt.Println("RESP", string(cnt))
+		zlog.Info("reflection list services response", zap.Any("response", toMap(resp)))
 
 		switch msg := resp.MessageResponse.(type) {
 		case *pbreflect.ServerReflectionResponse_ListServicesResponse:
@@ -72,32 +71,34 @@ func discover(services []string, conf *config) error {
 					Host:           target,
 					MessageRequest: &pbreflect.ServerReflectionRequest_FileContainingSymbol{FileContainingSymbol: serviceName},
 				})
-				errorCheck("sending reflection request", err)
+				derr.ErrorCheck("sending reflection request", err)
 
 				err = stream.Send(&pbreflect.ServerReflectionRequest{
 					Host:           target,
 					MessageRequest: &pbreflect.ServerReflectionRequest_AllExtensionNumbersOfType{AllExtensionNumbersOfType: serviceName},
 				})
-				errorCheck("sending reflection request", err)
+				derr.ErrorCheck("sending reflection request", err)
 
 				reqs += 2
 			}
 
-			//
 			for i := 0; i < reqs; i++ {
 				resp, err := stream.Recv()
-				errorCheck("receiving reflection response", err)
-
-				cnt, err := json.MarshalIndent(resp, "", "  ")
-				errorCheck("marshal response", err)
+				derr.ErrorCheck("receiving reflection response", err)
 
 				origReq := resp.OriginalRequest
-				switch msg := resp.MessageResponse.(type) {
+				zlog.Debug("reflection request response", zap.Any("request", toMap(origReq)), zap.Any("resonse", toMap(resp)))
 
+				switch msg := resp.MessageResponse.(type) {
 				case *pbreflect.ServerReflectionResponse_AllExtensionNumbersResponse:
 					r := msg.AllExtensionNumbersResponse
 					origSymbol := origReq.MessageRequest.(*pbreflect.ServerReflectionRequest_AllExtensionNumbersOfType).AllExtensionNumbersOfType
-					fmt.Println("All extensions number", r.BaseTypeName, r.ExtensionNumber, origSymbol)
+					zlog.Debug("all extensions number",
+						zap.String("base_type", r.BaseTypeName),
+						zap.Int32s("extension_number", r.ExtensionNumber),
+						zap.String("original_symbol", origSymbol),
+					)
+
 					conf.extensionNumbers[origSymbol] = resp
 
 				case *pbreflect.ServerReflectionResponse_FileDescriptorResponse:
@@ -107,7 +108,7 @@ func discover(services []string, conf *config) error {
 					for _, descFile := range r.FileDescriptorProto {
 						desc := &descriptor.FileDescriptorProto{}
 						err = proto.Unmarshal(descFile, desc)
-						errorCheck("unmarshal file descriptor proto", err)
+						derr.ErrorCheck("unmarshal file descriptor proto", err)
 
 						filenames = append(filenames, desc.Dependency...)
 					}
@@ -127,7 +128,6 @@ func discover(services []string, conf *config) error {
 					switch origPayload := origReq.MessageRequest.(type) {
 					case *pbreflect.ServerReflectionRequest_FileContainingSymbol:
 						origSymbol := origPayload.FileContainingSymbol
-						//fmt.Println("File descriptor resp", len(r.FileDescriptorProto), origSymbol)
 						conf.fileContainingSymbol[origSymbol] = resp
 
 					case *pbreflect.ServerReflectionRequest_FileByFilename:
@@ -136,20 +136,27 @@ func discover(services []string, conf *config) error {
 					}
 
 				case *pbreflect.ServerReflectionResponse_ErrorResponse:
-					fmt.Println("ERROR DUDE", msg.ErrorResponse.ErrorMessage)
+					zlog.Warn("received reflection error response", zap.Any("response", toMap(msg.ErrorResponse)))
 				default:
-					fmt.Println("Some other weird response!")
+					zlog.Warn("an unpextec response type was received but not handled")
 				}
-				_ = cnt
-				//fmt.Println("MAMAMMM", string(cnt))
-
 			}
 		default:
-			errorCheck("wuut, invalid response to the request we made", fmt.Errorf("we received type %T %+v", msg, msg))
+			derr.ErrorCheck("wuut, invalid response to the request we made", fmt.Errorf("we received type %T %+v", msg, msg))
 		}
 
-		errorCheck("close send", stream.CloseSend())
+		derr.ErrorCheck("close send", stream.CloseSend())
 	}
 
 	return nil
+}
+
+func toMap(any interface{}) map[string]interface{} {
+	cnt, err := json.Marshal(any)
+	derr.ErrorCheck("marshal response", err)
+
+	out := map[string]interface{}{}
+	derr.ErrorCheck("unmarshal response", json.Unmarshal(cnt, &out))
+
+	return out
 }
