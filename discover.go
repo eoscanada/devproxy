@@ -87,13 +87,13 @@ func discover(services []string, conf *config) error {
 				derr.ErrorCheck("receiving reflection response", err)
 
 				origReq := resp.OriginalRequest
-				zlog.Debug("reflection request response", zap.Any("request", toMap(origReq)), zap.Any("resonse", toMap(resp)))
+				zlog.Info("reflection request response", zap.Any("request", toMap(origReq)), zap.Any("resonse", toMap(resp)))
 
 				switch msg := resp.MessageResponse.(type) {
 				case *pbreflect.ServerReflectionResponse_AllExtensionNumbersResponse:
 					r := msg.AllExtensionNumbersResponse
 					origSymbol := origReq.MessageRequest.(*pbreflect.ServerReflectionRequest_AllExtensionNumbersOfType).AllExtensionNumbersOfType
-					zlog.Debug("all extensions number",
+					zlog.Info("all extensions number",
 						zap.String("base_type", r.BaseTypeName),
 						zap.Int32s("extension_number", r.ExtensionNumber),
 						zap.String("original_symbol", origSymbol),
