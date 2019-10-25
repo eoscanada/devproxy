@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/eoscanada/derr"
 	"github.com/gogo/protobuf/proto"
 	descriptor "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"go.uber.org/zap"
@@ -37,27 +36,29 @@ func discover(services []string, conf *config) error {
 		srv = strings.TrimSpace(srv)
 		target := strings.Replace(srv, "*", "", -1)
 
-		zlog.Info("querying service " + srv)
+		zl := zlog.With(zap.String("service", srv))
+
+		zl.Info("querying service")
 		// CALL the reflection API there
 		opts := dialOptions(srv)
 
 		conn, err := grpc.Dial(target, opts...)
-		derr.ErrorCheck("dialing to service "+srv, err)
+		errorCheck(zl, "dialing to service error", err)
 
 		client := pbreflect.NewServerReflectionClient(conn)
 		stream, err := client.ServerReflectionInfo(context.Background())
-		derr.ErrorCheck("setting up client", err)
+		errorCheck(zl, "setting up client error", err)
 
 		err = stream.Send(&pbreflect.ServerReflectionRequest{
 			Host:           target,
 			MessageRequest: &pbreflect.ServerReflectionRequest_ListServices{ListServices: "*"},
 		})
-		derr.ErrorCheck("sending list services request", err)
+		errorCheck(zl, "sending list services request error", err)
 
 		resp, err := stream.Recv()
-		derr.ErrorCheck("receiving list services response", err)
+		errorCheck(zl, "receiving list services response error", err)
 
-		zlog.Info("reflection list services response", zap.Any("response", toMap(resp)))
+		zl.Info("reflection list services response", zap.Any("response", toMap(resp)))
 
 		switch msg := resp.MessageResponse.(type) {
 		case *pbreflect.ServerReflectionResponse_ListServicesResponse:
@@ -71,29 +72,29 @@ func discover(services []string, conf *config) error {
 					Host:           target,
 					MessageRequest: &pbreflect.ServerReflectionRequest_FileContainingSymbol{FileContainingSymbol: serviceName},
 				})
-				derr.ErrorCheck("sending reflection request", err)
+				errorCheck(zl, "sending reflection request error", err)
 
 				err = stream.Send(&pbreflect.ServerReflectionRequest{
 					Host:           target,
 					MessageRequest: &pbreflect.ServerReflectionRequest_AllExtensionNumbersOfType{AllExtensionNumbersOfType: serviceName},
 				})
-				derr.ErrorCheck("sending reflection request", err)
+				errorCheck(zl, "sending reflection request error", err)
 
 				reqs += 2
 			}
 
 			for i := 0; i < reqs; i++ {
 				resp, err := stream.Recv()
-				derr.ErrorCheck("receiving reflection response", err)
+				errorCheck(zl, "receiving reflection response error", err)
 
 				origReq := resp.OriginalRequest
-				zlog.Info("reflection request response", zap.Any("request", toMap(origReq)), zap.Any("resonse", toMap(resp)))
+				zl.Info("reflection request response", zap.Any("request", toMap(origReq)), zap.Any("resonse", toMap(resp)))
 
 				switch msg := resp.MessageResponse.(type) {
 				case *pbreflect.ServerReflectionResponse_AllExtensionNumbersResponse:
 					r := msg.AllExtensionNumbersResponse
 					origSymbol := origReq.MessageRequest.(*pbreflect.ServerReflectionRequest_AllExtensionNumbersOfType).AllExtensionNumbersOfType
-					zlog.Info("all extensions number",
+					zl.Info("all extensions number",
 						zap.String("base_type", r.BaseTypeName),
 						zap.Int32s("extension_number", r.ExtensionNumber),
 						zap.String("original_symbol", origSymbol),
@@ -108,7 +109,7 @@ func discover(services []string, conf *config) error {
 					for _, descFile := range r.FileDescriptorProto {
 						desc := &descriptor.FileDescriptorProto{}
 						err = proto.Unmarshal(descFile, desc)
-						derr.ErrorCheck("unmarshal file descriptor proto", err)
+						errorCheck(zl, "unmarshal file descriptor proto error", err)
 
 						filenames = append(filenames, desc.Dependency...)
 					}
@@ -136,16 +137,16 @@ func discover(services []string, conf *config) error {
 					}
 
 				case *pbreflect.ServerReflectionResponse_ErrorResponse:
-					zlog.Warn("received reflection error response", zap.Any("response", toMap(msg.ErrorResponse)))
+					zl.Warn("received reflection error response", zap.Any("response", toMap(msg.ErrorResponse)))
 				default:
-					zlog.Warn("an unpextec response type was received but not handled")
+					zl.Warn("an unpextec response type was received but not handled")
 				}
 			}
 		default:
-			derr.ErrorCheck("wuut, invalid response to the request we made", fmt.Errorf("we received type %T %+v", msg, msg))
+			errorCheck(zl, "wuut, invalid response to the request we made error", fmt.Errorf("we received type %T %+v", msg, msg))
 		}
 
-		derr.ErrorCheck("close send", stream.CloseSend())
+		errorCheck(zl, "close send error", stream.CloseSend())
 	}
 
 	return nil
@@ -153,10 +154,10 @@ func discover(services []string, conf *config) error {
 
 func toMap(any interface{}) map[string]interface{} {
 	cnt, err := json.Marshal(any)
-	derr.ErrorCheck("marshal response", err)
+	errorCheck(zlog, "marshal response", err)
 
 	out := map[string]interface{}{}
-	derr.ErrorCheck("unmarshal response", json.Unmarshal(cnt, &out))
+	errorCheck(zlog, "unmarshal response", json.Unmarshal(cnt, &out))
 
 	return out
 }
