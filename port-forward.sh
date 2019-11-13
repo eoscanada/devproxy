@@ -4,13 +4,18 @@ ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 current_dir="`pwd`"
 services=(
-  # First so it's easy to always have the * on it when adding/removing services
-  "dgraphql-internal-v2"
+  # The internal service requires a `*` (see `main.go` default flags), put it first so it's easy when adding new service
+  "dgraphql-internal-v2:7001:9000"
 
-  # "abicodec-v2"
-  "blockmeta-v2"
-  "search-liverouter-v2"
-  "search-archive-v2-0"
+  # gRPC services
+  "abicodec-v2:7002:9000"
+  "blockmeta-v2:7003:9000"
+  "search-liverouter-v2:7004:9000"
+  "search-archive-v2-0:7005:9000"
+
+  # HTTP proxy services
+  "fluxdb-server-v2:8080:80"
+  "nodeos-api-v2:9999"
 )
 
 teardown() {
@@ -32,15 +37,16 @@ main() {
     services=$1; shift
   fi
 
-  let count=1
   for service in "${services[@]}"; do
-    let listen_port="7000 + ${count}"
-    let to_port=9000
+    name=$(printf $service | cut -f1 -d':')
+    listen_port=$(printf $service | cut -f2 -d':')
+    to_port=$(printf $service | cut -f3 -d':')
+    if [[ $to_port == "" ]]; then
+      to_port=$listen_port
+    fi
 
-    echo "Forwarding svc/$service (listening on $listen_port, forwarding to $to_port)"
-    kubectl port-forward svc/$service $listen_port:$to_port 1> /dev/null &
-
-    let count="$count + 1"
+    echo "Forwarding svc/$name (listening on $listen_port, forwarding to $to_port)"
+    kubectl port-forward svc/$name $listen_port:$to_port 1> /dev/null &
   done
 
   echo ""
@@ -54,7 +60,7 @@ usage() {
   echo "usage: port-forward.sh [<services>]"
   echo ""
   echo "For development purposes, start port-forwarding of all services known"
-  echo "by this script on a series of ports, 7001, 7002, ..."
+  echo "to the port specified by the service."
   echo ""
   echo "By default, these services are port forwarded:"
 
