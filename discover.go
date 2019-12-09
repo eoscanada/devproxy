@@ -26,6 +26,11 @@ func dialOptions(endpoint string) (opts []grpc.DialOption) {
 		zlog.Info("insecure endpoint")
 		opts = append(opts, grpc.WithInsecure())
 	}
+
+	var maxCallRecvMsgSize = 1024 * 1024 * 100
+	var defaultCallOptions = []grpc.CallOption{grpc.MaxCallRecvMsgSize(maxCallRecvMsgSize), grpc.WaitForReady(true)}
+	opts = append(opts, grpc.WithDefaultCallOptions(defaultCallOptions...))
+
 	return opts
 }
 
