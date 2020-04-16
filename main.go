@@ -11,9 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/eoscanada/derr"
-	pbdevproxy "github.com/eoscanada/devproxy/pb/dfuse/devproxy/v1"
-	"github.com/eoscanada/logging"
+	"github.com/dfuse-io/derr"
+	pbdevproxy "github.com/dfuse-io/dfuse-saas-priv/pb/dfuse/devproxy/v1"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -59,17 +58,14 @@ func LaunchGRPCServer(waitGroup *sync.WaitGroup) {
 	zlog.Debug("known services", zap.Strings("services", conf.allServices))
 	srv := &ReflectServer{conf: conf}
 
-	unaryLog, streamLog := logging.ServerInterceptors()
 	gs := grpc.NewServer(
 		grpc_middleware.WithUnaryServerChain(
 			grpc_ctxtags.UnaryServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 			grpc_prometheus.UnaryServerInterceptor,
-			unaryLog,
 		),
 		grpc_middleware.WithStreamServerChain(
 			grpc_ctxtags.StreamServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
 			grpc_prometheus.StreamServerInterceptor,
-			streamLog,
 		),
 		grpc.CustomCodec(proxy.Codec()),
 		grpc.UnknownServiceHandler(proxy.TransparentHandler(srv.Director)),

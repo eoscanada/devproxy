@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	pbdevproxy "github.com/eoscanada/devproxy/pb/dfuse/devproxy/v1"
+	pbdevproxy "github.com/dfuse-io/dfuse-saas-priv/pb/dfuse/devproxy/v1"
 	proxy "github.com/mwitkow/grpc-proxy/proxy"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
