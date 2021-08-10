@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dfuse-io/derr"
+	"github.com/streamingfast/derr"
 	pbdevproxy "github.com/dfuse-io/dfuse-saas-priv/pb/dfuse/devproxy/v1"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
