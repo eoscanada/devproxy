@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/streamingfast/derr"
-	pbdevproxy "github.com/dfuse-io/dfuse-saas-priv/pb/dfuse/devproxy/v1"
+	pbdevproxy "github.com/streamingfast/sf-saas-priv/pb/dfuse/devproxy/v1"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
